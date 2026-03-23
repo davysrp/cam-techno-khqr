@@ -14,7 +14,7 @@ CORS(app)  # Allow cross-origin requests
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 BAKONG_TOKEN = os.environ.get("BAKONG_TOKEN", "YOUR_BAKONG_DEVELOPER_TOKEN_HERE")
-BANK_ACCOUNT  = os.environ.get("BANK_ACCOUNT",  "davy_dorn@aclb")       # e.g. john@aclb
+BANK_ACCOUNT  = os.environ.get("BANK_ACCOUNT",  "sophath_9999@aclb")       # e.g. john@aclb
 MERCHANT_NAME = os.environ.get("MERCHANT_NAME", "CT Service")
 MERCHANT_CITY = os.environ.get("MERCHANT_CITY", "Phnom Penh")
 PHONE_NUMBER  = os.environ.get("PHONE_NUMBER",  "85512345678")
