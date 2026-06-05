@@ -82,16 +82,63 @@ Click **Restart** in the Python App panel. Your API is live! 🎉
 ## 📡 API Reference
 
 ### `GET /`
-Returns API info and available endpoints.
+Returns API info, merchant list, and available endpoints.
+
+---
+
+### `GET /api/health`
+Health check — returns `ok` and total merchant count.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "total_merchants": 4
+}
+```
+
+---
+
+### `GET /api/merchants`
+List all registered merchant accounts.
+
+**Response:**
+```json
+{
+  "success": true,
+  "merchants": {
+    "ct": {
+      "name": "CT Services",
+      "bank_account": "sophath_9999@aclb",
+      "merchant_name": "CT Services",
+      "merchant_city": "Phnom Penh",
+      "store_label": "CT Services"
+    }
+  }
+}
+```
 
 ---
 
 ### `POST /api/qr/generate`
-Generate a new KHQR payment QR code.
+Generate a KHQR payment QR code for a **pre-registered merchant**. No Bakong token required.
 
 **Request body (JSON):**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `merchant_id` | string | **Yes** | One of: `ct`, `chatkh`, `katanamovie`, `iskillbiz` |
+| `amount` | number | **Yes** | Payment amount (positive) |
+| `currency` | string | No | `"USD"` or `"KHR"` — default `"USD"` |
+| `bill_number` | string | No | Custom reference — auto-generated if omitted |
+| `terminal` | string | No | Terminal/cashier label — default `"Cashier-01"` |
+| `static` | boolean | No | `true` for static QR — default `false` |
+| `callback` | string | No | Deeplink callback URL |
+| `app_icon` | string | No | App icon URL for deeplink |
+
 ```json
 {
+  "merchant_id": "ct",
   "amount": 5.00,
   "currency": "USD",
   "bill_number": "INV-2024-001",
@@ -105,6 +152,8 @@ Generate a new KHQR payment QR code.
 ```json
 {
   "success": true,
+  "merchant_id": "ct",
+  "merchant": "CT Services",
   "qr_string": "00020101021229...",
   "md5": "a7121ca103c...eb3671b9601a6",
   "bill_number": "INV-2024-001",
@@ -117,28 +166,99 @@ Generate a new KHQR payment QR code.
 
 ---
 
-### `GET /api/qr/check/<md5>`
-Check if a payment has been completed.
+### `POST /api/qr/generate-dynamic`
+Generate a KHQR QR code for **any merchant** without pre-registration. No Bakong token required.
+
+**Request body (JSON):**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `bank_account` | string | **Yes** | e.g. `"name@aclb"` or `"name@bkrt"` |
+| `merchant_name` | string | **Yes** | Display name of the merchant |
+| `amount` | number | **Yes** | Payment amount (positive) |
+| `merchant_city` | string | No | Default: `"Phnom Penh"` |
+| `phone_number` | string | No | e.g. `"855XXXXXXXXX"` |
+| `store_label` | string | No | Defaults to `merchant_name` |
+| `currency` | string | No | `"USD"` or `"KHR"` — default `"USD"` |
+| `bill_number` | string | No | Auto-generated if omitted |
+| `terminal` | string | No | Terminal/cashier label — default `"Cashier-01"` |
+| `static` | boolean | No | `true` for static QR — default `false` |
+| `callback` | string | No | Deeplink callback URL |
+| `app_icon` | string | No | App icon URL for deeplink |
+
+```json
+{
+  "bank_account": "john@aclb",
+  "merchant_name": "John Shop",
+  "merchant_city": "Phnom Penh",
+  "phone_number": "85512345678",
+  "amount": 10.00,
+  "currency": "USD"
+}
+```
 
 **Response:**
 ```json
 {
   "success": true,
+  "bank_account": "john@aclb",
+  "merchant_name": "John Shop",
+  "merchant_city": "Phnom Penh",
+  "store_label": "John Shop",
+  "qr_string": "00020101021229...",
+  "md5": "a7121ca103c...eb3671b9601a6",
+  "bill_number": "TRX4A2B1C3D2E",
+  "amount": 10.00,
+  "currency": "USD",
+  "qr_image": "data:image/png;base64,..."
+}
+```
+
+---
+
+### `GET /api/qr/check/<md5>`
+Check if a payment has been completed. Requires a Bakong token.
+
+**Path:** `/api/qr/check/<md5>` (md5 = 32-character hash)
+
+**Query parameters:**
+
+| Param | Required | Description |
+|---|---|---|
+| `merchant_id` | **Yes** | e.g. `ct` |
+| `bakong_token` | No | JWT token — falls back to `BAKONG_TOKEN` env var |
+
+**Example:** `GET /api/qr/check/a7121ca103c...?merchant_id=ct&bakong_token=eyJ...`
+
+**Response:**
+```json
+{
+  "success": true,
+  "merchant_id": "ct",
   "md5": "a7121ca103c...",
   "paid": true,
-  "detail": { ... }
+  "detail": { "responseCode": 0, ... }
 }
 ```
 
 ---
 
 ### `POST /api/qr/check-bulk`
-Check up to 50 payments at once.
+Check up to 50 payments at once. Requires a Bakong token.
 
-**Request:**
+**Request body (JSON):**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `merchant_id` | string | **Yes** | e.g. `"ct"` |
+| `md5_list` | array | **Yes** | List of MD5 hashes (max 50) |
+| `bakong_token` | string | No | JWT token — falls back to `BAKONG_TOKEN` env var |
+
 ```json
 {
-  "md5_list": ["abc123...", "def456...", "ghi789..."]
+  "merchant_id": "ct",
+  "md5_list": ["abc123...", "def456...", "ghi789..."],
+  "bakong_token": "eyJ..."
 }
 ```
 
@@ -146,6 +266,7 @@ Check up to 50 payments at once.
 ```json
 {
   "success": true,
+  "merchant_id": "ct",
   "paid_list": ["abc123..."]
 }
 ```
@@ -153,12 +274,22 @@ Check up to 50 payments at once.
 ---
 
 ### `GET /api/payment/<md5>`
-Get full transaction details.
+Get full transaction details for a payment. Requires a Bakong token.
+
+**Path:** `/api/payment/<md5>` (md5 = 32-character hash)
+
+**Query parameters:**
+
+| Param | Required | Description |
+|---|---|---|
+| `merchant_id` | **Yes** | e.g. `ct` |
+| `bakong_token` | No | JWT token — falls back to `BAKONG_TOKEN` env var |
 
 **Response:**
 ```json
 {
   "success": true,
+  "merchant_id": "ct",
   "payment": {
     "hash": "...",
     "fromAccountId": "sender@bank",
